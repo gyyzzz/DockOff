@@ -1,5 +1,7 @@
 # DockOff
 
+其他语言：[中文](README_zh.md)
+
 DockOff collects Docker RPMs on a connected builder and creates one offline `tar.gz`. A Go installer on the isolated target checks the host, installs Docker Engine and Compose v2, starts the service, and verifies the result without network access. Business images are kept separate and can be loaded later with `docker load`.
 
 ## Supported targets
