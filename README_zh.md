@@ -1,74 +1,58 @@
 # DockOff
 
-DockOff 在联网构建机上收集 Docker RPM 并生成单个离线 `tar.gz`；隔离目标机由 Go 安装器完成检查、安装、启动和验证。安装过程不访问网络。业务镜像不打入安装包，可在安装 Docker 后单独传输并用 `docker load` 导入。
+DockOff 为 openEuler 22.03 LTS-SP4 的 x86_64 和 aarch64 系统构建 Docker 离线安装包。在匹配的联网构建机上，它收集 Docker Engine 28.5.2、containerd.io 2.1.5、Compose v2.40.3 及所需依赖的 RPM，连同目标架构的 Go 安装器打成一个 `tar.gz`。隔离目标机上的安装器检查系统、归档完整性、RPM 签名和离线依赖后，从本地安装 RPM、启动 Docker 并验证 Engine 和 Compose，全程不访问网络。业务镜像单独传输，安装后可用 `docker load` 导入。
+
+[English](README.md)
+
+## Quickstart（快速开始）
+
+准备一台联网的 openEuler 22.03 LTS-SP4 x86_64 构建机，安装 Go 1.24+、DNF、`rpm` 和 `rpmkeys`。建议使用干净系统，因为 DNF 会根据构建机已安装的软件解析依赖。`prepare` 需要 root 权限，并会将已校验的签名公钥导入构建机的 RPM 信任库。
+
+1. 编译 DockOff 并准备 x86_64 目标：
+
+   ```sh
+   go build -o dockoff ./cmd/dockoff
+   sudo ./dockoff prepare \
+     --target openeuler-22.03-lts-sp4-amd64 \
+     --output ./staging/openeuler-amd64
+   ```
+
+2. 将 staging 目录打包。记录 `bundle` 输出的 SHA-256，以便传输后核对：
+
+   ```sh
+   ./dockoff bundle \
+     --staging ./staging/openeuler-amd64 \
+     --output ./dockoff-docker.tar.gz
+   ```
+
+3. 将归档复制到匹配的目标机，用 `sha256sum` 与记录值核对，再解压并以 root 安装：
+
+   ```sh
+   sha256sum dockoff-docker.tar.gz
+   mkdir package
+   tar -xzf dockoff-docker.tar.gz -C package
+   cd package
+   sudo ./install-openeuler-22.03-lts-sp4-amd64 install --bundle . --check
+   sudo ./install-openeuler-22.03-lts-sp4-amd64 install --bundle .
+   ```
+
+`--check` 只检查系统、完整性、签名、冲突和离线依赖，不安装 RPM 或更改 Docker 服务。如需包含 aarch64，在原生 aarch64 openEuler SP4 构建机上使用目标 `openeuler-22.03-lts-sp4-arm64` 执行 `prepare`，将其 staging 目录传到打包机，并给 `bundle` 增加一个 `--staging`。运行 `./dockoff targets` 可列出内置目标 ID。
 
 ## 支持目标
 
-每个“发行版 + 版本 + 架构”组合都是独立支持目标。当前内置目标：
-
-| Target ID | 操作系统 | 架构 | Docker Engine | Compose |
+| Target ID | 操作系统 | 架构 | Engine | Compose |
 | --- | --- | --- | --- | --- |
 | `openeuler-22.03-lts-sp4-amd64` | openEuler 22.03 (LTS-SP4) | x86_64 | 28.5.2 | 2.40.3 |
 | `openeuler-22.03-lts-sp4-arm64` | openEuler 22.03 (LTS-SP4) | aarch64 | 28.5.2 | 2.40.3 |
 
-x86_64 目标已在 openEuler SP4 上验证安装和容器运行。ARM64 目前只支持构建配置和安装器交叉编译，尚未做 ARM 实机验证。
+x86_64 目标已验证安装和容器运行。aarch64 已有 profile 和安装器交叉编译支持，尚未在 ARM 实机验证安装。每个系统版本和架构都有独立的目标 profile；安装器要求目标机与归档中的目标精确匹配。
 
-运行 `dockoff targets` 查看内置目标。
+## 配置与校验
 
-## 构建离线包
+`prepare` 支持用 `--docker-repo <HTTPS URL>` 指定 Docker RPM 镜像，用 `--docker-key <文件>` 指定 Docker 签名公钥。公钥必须匹配目标 profile 中固定的 SHA-256。`internal/targets/profiles/` 还定义系统匹配条件、软件版本、仓库和可信公钥。
 
-`prepare` 必须在目标操作系统和目标架构一致的联网构建机上运行。建议使用干净的 openEuler SP4 构建机，因为 DNF 会根据构建机当前已安装的软件解析依赖。构建机需要 Go、DNF、`rpm` 和 `rpmkeys`，并以 root 执行；准备过程会把已校验的签名公钥导入构建机 RPM 信任库。
+安装器禁用 DNF 软件源和插件，仅使用归档中的 RPM。安装前检查文件散列、RPM 签名与元数据、软件冲突、磁盘空间和 systemd；日志写入 `/var/log/dockoff/`。归档提供 SHA-256 校验值，但没有项目级签名，因此传输后应核对 `bundle` 输出的归档散列。
 
-```sh
-go build -o dockoff ./cmd/dockoff
+## 新增目标
 
-sudo ./dockoff prepare \
-  --target openeuler-22.03-lts-sp4-amd64 \
-  --output ./staging/openeuler-amd64
-```
-
-ARM64 的 staging 应在原生 ARM64 openEuler SP4 构建机生成：
-
-```sh
-sudo ./dockoff prepare \
-  --target openeuler-22.03-lts-sp4-arm64 \
-  --output ./staging/openeuler-arm64
-```
-
-如需使用 Docker RPM 镜像，可传 `--docker-repo <HTTPS地址>`；`--docker-key <公钥文件>` 可指定 Docker 官方签名公钥。公钥内容必须匹配 profile 中固定的 SHA-256。目标 profile、组件版本、RPM 架构、仓库和公钥散列均在 `internal/targets/profiles/` 中配置。
-
-一个或多个 staging 目录可以合并为一个归档：
-
-```sh
-./dockoff bundle \
-  --staging ./staging/openeuler-amd64 \
-  --staging ./staging/openeuler-arm64 \
-  --output ./dockoff-docker.tar.gz
-```
-
-每个 `--staging` 对应一个目标，可以重复传入。`bundle` 根据 profile 中的 Go 架构交叉编译安装器，并打印归档 SHA-256。只打包提供的目标。
-
-## 目标机安装
-
-将归档复制到目标机并解压，然后以 root 执行归档中的 `install-<target-id>`。例如：
-
-```sh
-mkdir package
-tar -xzf dockoff-docker.tar.gz -C package
-cd package
-sudo ./install-openeuler-22.03-lts-sp4-amd64 install --bundle .
-```
-
-安装器根据目标机 `/etc/os-release` 和自身架构识别 profile，并要求归档中存在完全匹配的目标。`--check` 可只执行环境、清单、签名、冲突和离线依赖预检，不安装 RPM 或启动服务：
-
-```sh
-sudo ./install-openeuler-22.03-lts-sp4-amd64 install --bundle . --check
-```
-
-安装器禁用全部 DNF 软件源和插件，只从归档中的 RPM 安装。它会校验文件 SHA-256、RPM 签名、包元数据、systemd、磁盘空间和已安装软件冲突，随后启动 Docker 并检查 Engine、Compose 和 daemon。日志写入 `/var/log/dockoff/`。
-
-## 新增支持目标
-
-新增发行版、发行版版本或架构时，为每个新组合增加独立 JSON profile，不复用其他目标的版本锁、仓库地址或 RPM 架构设置。profile 需要定义唯一 `id`、`os_id`、`os_version`、`go_arch`、`native_arch`、包管理器、服务名、组件版本、仓库 URL、RPM pin 和签名公钥 SHA-256。随后在对应联网系统上准备该目标的 staging，验证依赖闭包、签名和离线预检，再将 staging 传给 `bundle`。安装器只有在目标机信息精确匹配 profile 时才会安装。
-
-完整的扩展步骤、清单格式和校验边界见 [详细设计](docs/详细设计.md)。
+新增系统版本或架构时，需要独立的 JSON profile，并在匹配的构建机和目标机上验证。profile 字段、操作流程及验证边界见[详细设计](docs/详细设计.md)。
