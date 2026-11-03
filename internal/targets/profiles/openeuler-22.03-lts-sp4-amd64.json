@@ -1,0 +1,27 @@
+{
+  "id": "openeuler-22.03-lts-sp4-amd64",
+  "os_id": "openEuler",
+  "os_version": "22.03 (LTS-SP4)",
+  "go_arch": "amd64",
+  "native_arch": "x86_64",
+  "package_format": "rpm",
+  "package_manager": "dnf",
+  "service": "docker",
+  "engine_version": "28.5.2",
+  "compose_version": "2.40.3",
+  "repositories": {
+    "os": "https://repo.openeuler.org/openEuler-22.03-LTS-SP4/OS/x86_64/",
+    "updates": "https://repo.openeuler.org/openEuler-22.03-LTS-SP4/update/x86_64/",
+    "docker": "https://download.docker.com/linux/centos/9/x86_64/stable/"
+  },
+  "packages": [
+    { "name": "docker-ce", "epoch": "3", "version": "28.5.2", "release": "1.el9" },
+    { "name": "docker-ce-cli", "epoch": "1", "version": "28.5.2", "release": "1.el9" },
+    { "name": "containerd.io", "epoch": "0", "version": "2.1.5", "release": "1.el9" },
+    { "name": "docker-compose-plugin", "epoch": "0", "version": "2.40.3", "release": "1.el9" }
+  ],
+  "key_sha256": {
+    "docker.asc": "e6c650e0700b1bf4868b693b30761b926844befc8a0acb7ac0dd9b1faf1b7423",
+    "openeuler.asc": "006e79d37c10e74c24df6d07c4efc4176515cec009daa5ed493b06f5b6ef39c1"
+  }
+}

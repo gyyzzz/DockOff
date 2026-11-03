@@ -1,0 +1,8 @@
+.DS_Store
+/dockoff
+/install-*
+/staging/
+/dist/
+/bin/
+*.tar.gz
+*.rpm
