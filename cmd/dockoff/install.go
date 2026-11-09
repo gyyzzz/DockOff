@@ -95,7 +95,7 @@ func runInstall(args []string) (result error) {
 			return fmt.Errorf("RPM metadata differs from manifest: %s", p.File)
 		}
 	}
-	if err := checkConflicts(packages); err != nil {
+	if err := checkConflicts(profile); err != nil {
 		return err
 	}
 	for _, path := range []string{"/", "/usr", "/var"} {
@@ -230,15 +230,19 @@ func verifySignatures(root string, packages []rpmInfo, profile targets.Profile) 
 	return nil
 }
 
-func checkConflicts(packages []rpmInfo) error {
+func checkConflicts(profile targets.Profile) error {
 	text, err := output("rpm", "-qa", "--qf", "%{NAME}\t%{EPOCHNUM}:%{VERSION}-%{RELEASE}\t%{ARCH}\n")
 	if err != nil {
 		return err
 	}
+	return validateInstalledPackages(text, profile)
+}
+
+func validateInstalledPackages(text string, profile targets.Profile) error {
 	conflicts := map[string]bool{"docker-engine": true, "docker": true, "docker-common": true, "docker-latest": true, "docker-latest-logrotate": true, "docker-logrotate": true, "docker-selinux": true, "podman-docker": true, "containerd": true, "runc": true, "moby-engine": true, "moby-cli": true, "docker-compose": true, "docker-ce-rootless-extras": true}
-	expected := map[string]rpmInfo{}
-	for _, p := range packages {
-		expected[p.Name] = p
+	expected := map[string]string{}
+	for _, p := range profile.Packages {
+		expected[p.Name] = p.EVR()
 	}
 	for _, line := range strings.Split(text, "\n") {
 		fields := strings.Split(line, "\t")
@@ -248,7 +252,7 @@ func checkConflicts(packages []rpmInfo) error {
 		if conflicts[fields[0]] {
 			return fmt.Errorf("conflicting installed package %s; remove or migrate it explicitly first", fields[0])
 		}
-		if p, ok := expected[fields[0]]; ok && (fields[1] != p.evr() || fields[2] != p.Arch) {
+		if evr, ok := expected[fields[0]]; ok && (fields[1] != evr || fields[2] != profile.NativeArch) {
 			return fmt.Errorf("existing %s is %s.%s; automatic upgrades/replacements are not supported", fields[0], fields[1], fields[2])
 		}
 	}

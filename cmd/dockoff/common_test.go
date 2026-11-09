@@ -55,6 +55,39 @@ func TestValidatePackagesRejectsMissingComponent(t *testing.T) {
 	}
 }
 
+func TestValidateInstalledPackagesAllowsDistributionReleasePackage(t *testing.T) {
+	profile, err := targets.Lookup("bclinux-21.10u5-amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	installed := "bclinux-release\t0:21.10U5-59.1.bclinux.21.10U5\tx86_64\n"
+	if err := validateInstalledPackages(installed, profile); err != nil {
+		t.Fatalf("distribution release package rejected: %v", err)
+	}
+}
+
+func TestValidateInstalledPackagesRejectsOldDockerVersion(t *testing.T) {
+	profile, err := targets.Lookup("bclinux-21.10u5-amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	installed := "docker-ce\t3:26.1.4-1.el9\tx86_64\n"
+	if err := validateInstalledPackages(installed, profile); err == nil {
+		t.Fatal("expected old Docker version rejection")
+	}
+}
+
+func TestValidateInstalledPackagesRejectsConflictingRuntime(t *testing.T) {
+	profile, err := targets.Lookup("bclinux-21.10u5-amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	installed := "podman-docker\t0:4.9.0-1\tx86_64\n"
+	if err := validateInstalledPackages(installed, profile); err == nil {
+		t.Fatal("expected conflicting runtime rejection")
+	}
+}
+
 func TestInventoryRejectsSymlink(t *testing.T) {
 	root := t.TempDir()
 	if err := os.Symlink(filepath.Join(root, "missing"), filepath.Join(root, "link")); err != nil {
