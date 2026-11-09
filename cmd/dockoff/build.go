@@ -21,6 +21,7 @@ func runPrepare(args []string) error {
 	targetID := fs.String("target", "", "target profile ID (see dockoff targets)")
 	repo := fs.String("docker-repo", "", "optional Docker RPM repository mirror URL")
 	key := fs.String("docker-key", "", "optional Docker RPM signing key file; otherwise fetched from Docker")
+	osKey := fs.String("os-key", "", "optional OS RPM signing key file; otherwise fetched from profile URL")
 	dest := fs.String("output", "", "new staging directory")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -74,12 +75,30 @@ func runPrepare(args []string) error {
 	if *key != "" {
 		err = copyFile(*key, dockerKey, 0644)
 	} else {
-		err = fetch("https://download.docker.com/linux/centos/gpg", dockerKey)
+		keyURL := profile.Repositories.DockerKey
+		if keyURL == "" {
+			keyURL = "https://download.docker.com/linux/centos/gpg"
+		}
+		err = fetch(keyURL, dockerKey)
 	}
 	if err != nil {
 		return fmt.Errorf("Docker signing key: %w", err)
 	}
-	if err := fetch(profile.Repositories.OS+"RPM-GPG-KEY-openEuler", filepath.Join(keyDir, "openeuler.asc")); err != nil {
+	osKeyName := ""
+	for name := range profile.Keys {
+		if name != "docker.asc" {
+			osKeyName = name
+		}
+	}
+	osKeyPath := filepath.Join(keyDir, osKeyName)
+	if *osKey != "" {
+		err = copyFile(*osKey, osKeyPath, 0644)
+	} else if profile.Repositories.OSKey != "" {
+		err = fetch(profile.Repositories.OSKey, osKeyPath)
+	} else {
+		return fmt.Errorf("target %s requires --os-key", profile.ID)
+	}
+	if err != nil {
 		return err
 	}
 	for name, sum := range profile.Keys {
@@ -90,10 +109,6 @@ func runPrepare(args []string) error {
 		if actual != sum {
 			return fmt.Errorf("unrecognized %s signing key", name)
 		}
-		// Only the disposable builder trust database changes at preparation time.
-		if err := command("rpm", "--import", filepath.Join(keyDir, name)); err != nil {
-			return err
-		}
 	}
 	repository := filepath.Join(root, "rpms", profile.ID)
 	if err := os.MkdirAll(repository, 0755); err != nil {
@@ -103,11 +118,23 @@ func runPrepare(args []string) error {
 	if err := os.MkdirAll(repoDir, 0755); err != nil {
 		return err
 	}
+	installRoot := filepath.Join(root, "installroot")
+	if err := os.MkdirAll(installRoot, 0755); err != nil {
+		return err
+	}
+	if err := command("rpm", "--root", installRoot, "--initdb"); err != nil {
+		return err
+	}
+	for name := range profile.Keys {
+		if err := command("rpm", "--root", installRoot, "--import", filepath.Join(keyDir, name)); err != nil {
+			return err
+		}
+	}
 	config := filepath.Join(root, "build.conf")
 	if err := writeBuildConfig(config, repoDir, sources); err != nil {
 		return err
 	}
-	cmdArgs := []string{"--config=" + config, "--setopt=install_weak_deps=False", "--downloadonly", "--downloaddir=" + repository, "install"}
+	cmdArgs := []string{"--config=" + config, "--installroot=" + installRoot, "--releasever=/", "--setopt=install_weak_deps=False", "--assumeyes", "--downloadonly", "--downloaddir=" + repository, "install"}
 	for _, pin := range profile.Packages {
 		cmdArgs = append(cmdArgs, pin.Name+"-"+pin.EVR()+"."+profile.NativeArch)
 	}

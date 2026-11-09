@@ -44,8 +44,9 @@ DockOff 为 openEuler 22.03 LTS-SP4 的 x86_64 和 aarch64 系统构建 Docker �
 | --- | --- | --- | --- | --- |
 | `openeuler-22.03-lts-sp4-amd64` | openEuler 22.03 (LTS-SP4) | x86_64 | 28.5.2 | 2.40.3 |
 | `openeuler-22.03-lts-sp4-arm64` | openEuler 22.03 (LTS-SP4) | aarch64 | 28.5.2 | 2.40.3 |
+| `bclinux-21.10u5-amd64` | BigCloud Enterprise Linux 21.10 U5 | x86_64 | 28.5.2 | 2.40.3 |
 
-x86_64 目标已验证安装和容器运行。aarch64 已有 profile 和安装器交叉编译支持，尚未在 ARM 实机验证安装。每个系统版本和架构都有独立的目标 profile；安装器要求目标机与归档中的目标精确匹配。
+openEuler x86_64 目标已验证安装和容器运行。BC-Linux 21.10 U5 已通过 RPM staging 验证，尚未在该目标上做离线预检和实际安装。aarch64 已有 profile 和安装器交叉编译支持，尚未在 ARM 实机验证安装。每个系统版本和架构都有独立的目标 profile；安装器要求目标机与归档中的目标精确匹配。
 
 ## 配置与校验
 
@@ -56,3 +57,7 @@ x86_64 目标已验证安装和容器运行。aarch64 已有 profile 和安装�
 ## 新增目标
 
 新增系统版本或架构时，需要独立的 JSON profile，并在匹配的构建机和目标机上验证。profile 字段、操作流程及验证边界见[详细设计](docs/详细设计.md)。
+
+新增 BC-Linux 目标时，可调用项目 skill `$bc-linux-target` 获取流程指引。它会采集构建机和目标机身份信息，询问组件版本（未指定时默认采用现有 openEuler profile 的版本），检查仓库和签名密钥信息，校验 profile，并在确认 root 操作影响后执行 `prepare`。`prepare` 成功只代表 staging 阶段通过；目标机离线预检和实际安装仍需单独验证。
+
+BC-Linux 21.10 U4/U5 的环境采集和构建记录见[发现记录](docs/bclinux-discovery.md)。

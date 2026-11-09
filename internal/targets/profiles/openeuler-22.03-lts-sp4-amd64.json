@@ -12,7 +12,8 @@
   "repositories": {
     "os": "https://repo.openeuler.org/openEuler-22.03-LTS-SP4/OS/x86_64/",
     "updates": "https://repo.openeuler.org/openEuler-22.03-LTS-SP4/update/x86_64/",
-    "docker": "https://download.docker.com/linux/centos/9/x86_64/stable/"
+    "docker": "https://download.docker.com/linux/centos/9/x86_64/stable/",
+    "os_key_url": "https://repo.openeuler.org/openEuler-22.03-LTS-SP4/OS/x86_64/RPM-GPG-KEY-openEuler"
   },
   "packages": [
     { "name": "docker-ce", "epoch": "3", "version": "28.5.2", "release": "1.el9" },

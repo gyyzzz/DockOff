@@ -30,9 +30,11 @@ type Profile struct {
 }
 
 type Repositories struct {
-	OS      string `json:"os"`
-	Updates string `json:"updates"`
-	Docker  string `json:"docker"`
+	OS        string `json:"os"`
+	Updates   string `json:"updates"`
+	Docker    string `json:"docker"`
+	OSKey     string `json:"os_key_url,omitempty"`
+	DockerKey string `json:"docker_key_url,omitempty"`
 }
 
 type PackagePin struct {
@@ -130,6 +132,14 @@ func (p Profile) Validate() error {
 			return fmt.Errorf("repository must be an HTTPS URL: %q", address)
 		}
 	}
+	for _, source := range []string{p.Repositories.OSKey, p.Repositories.DockerKey} {
+		if source != "" {
+			u, err := url.Parse(source)
+			if err != nil || u.Scheme != "https" || u.Host == "" {
+				return fmt.Errorf("key source must be an HTTPS URL: %q", source)
+			}
+		}
+	}
 	if len(p.Packages) == 0 || len(p.Keys) == 0 {
 		return fmt.Errorf("missing package pins or signing keys")
 	}
@@ -147,6 +157,9 @@ func (p Profile) Validate() error {
 		if _, err := hex.DecodeString(sum); err != nil {
 			return fmt.Errorf("invalid SHA-256 for signing key %q", name)
 		}
+	}
+	if _, ok := p.Keys["docker.asc"]; !ok || len(p.Keys) != 2 {
+		return fmt.Errorf("expected Docker and one OS signing key")
 	}
 	return nil
 }

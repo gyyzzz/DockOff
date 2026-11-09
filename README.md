@@ -44,8 +44,9 @@ Use a connected openEuler 22.03 LTS-SP4 x86_64 builder with Go 1.24+, DNF, `rpm`
 | --- | --- | --- | --- | --- |
 | `openeuler-22.03-lts-sp4-amd64` | openEuler 22.03 (LTS-SP4) | x86_64 | 28.5.2 | 2.40.3 |
 | `openeuler-22.03-lts-sp4-arm64` | openEuler 22.03 (LTS-SP4) | aarch64 | 28.5.2 | 2.40.3 |
+| `bclinux-21.10u5-amd64` | BigCloud Enterprise Linux 21.10 U5 | x86_64 | 28.5.2 | 2.40.3 |
 
-The x86_64 target has been tested for installation and container operation. The aarch64 profile and installer cross-compilation are available, but installation on ARM hardware has not been tested. Each OS release and architecture has its own target profile; the installer requires an exact match with the host and bundle.
+The openEuler x86_64 target has been tested for installation and container operation. BC-Linux 21.10 U5 has passed package staging validation; offline preflight and installation on that target remain untested. The aarch64 profile and installer cross-compilation are available, but installation on ARM hardware has not been tested. Each OS release and architecture has its own target profile; the installer requires an exact match with the host and bundle.
 
 ## Configuration and safeguards
 
@@ -56,3 +57,5 @@ The installer uses only bundled RPMs, with DNF repositories and plugins disabled
 ## Adding targets
 
 New OS release and architecture combinations require a separate JSON profile and validation on a matching builder and target host. See [the design document](docs/详细设计.md) for the profile fields, workflow, and validation limits.
+
+For a guided BC-Linux target workflow, invoke the project skill `$bc-linux-target`. It collects build and target host identity, asks for component versions (defaulting to the existing openEuler pins), checks repository and signing-key inputs, validates a profile, and runs `prepare` only after confirming its root-side effects. Successful `prepare` is staging validation only; target offline preflight and installation still need separate validation.
